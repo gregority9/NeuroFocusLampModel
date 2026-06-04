@@ -5,16 +5,12 @@ import sys
 import pandas as pd
 import yaml
 
-from sklearn.metrics import balanced_accuracy_score
 from sklearn.metrics import confusion_matrix
-from sklearn.metrics import f1_score
-from sklearn.metrics import precision_score
-from sklearn.metrics import recall_score
-from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import LeaveOneGroupOut
 
 from src.models.model_pipeline import build_model_pipeline
-from src.evaluation.metrics import compute_metrics
+from src.evaluation.metrics import compute_metrics, compute_metrics_by_column, compute_metrics_per_group, \
+    compute_metrics_per_task
 
 
 def load_config(config_path):
@@ -128,10 +124,14 @@ def run_loso_training(df, config):
     y = df[target_column]
     groups = df[group_column]
 
+    # Fold = one experiment, one training test in which one person is placed for testing, others to train
     logo = LeaveOneGroupOut()
     fold_results = []
     all_predictions = []
+    all_feature_importance = []
 
+
+    # Calculating result for every fold separately
     for fold_id, split in enumerate(logo.split(X, y, groups)):
         train_index, test_index = split
 
@@ -150,6 +150,16 @@ def run_loso_training(df, config):
 
         model = build_model_pipeline(config)
         model.fit(X_train, y_train)
+
+        feature_importance = extract_feature_importance(
+            model,
+            feature_columns,
+            fold_id,
+            test_subject
+        )
+
+        if feature_importance is not None:
+            all_feature_importance.append(feature_importance)
 
         y_pred = model.predict(X_test)
         y_score = get_prediction_scores(model, X_test)
@@ -178,7 +188,40 @@ def run_loso_training(df, config):
     results_df = pd.DataFrame(fold_results)
     predictions_df = pd.concat(all_predictions, ignore_index=True)
 
-    return results_df, predictions_df
+    if len(all_feature_importance) > 0:
+        feature_importance_df = pd.concat(all_feature_importance, ignore_index=True)
+    else:
+        feature_importance_df = pd.DataFrame()
+
+    return results_df, predictions_df, feature_importance_df
+
+def extract_feature_importance(model, feature_columns, fold_id, test_subject):
+    """
+   Extract feature coefficients from Logistic Regression.
+   Positive coefficient means stronger support for class 1.
+   Negative coefficient means stronger support for class 0.
+   """
+
+    classifier = model.named_steps["classifier"]
+
+    if not hasattr(classifier, "coef_"):
+        return None
+
+    coefficients = classifier.coef_[0]
+    rows = []
+
+    for feature, coefficient in zip(feature_columns, coefficients):
+        rows.append({
+            "fold_id": fold_id,
+            "test_subject": test_subject,
+            "feature": feature,
+            "coefficient": coefficient,
+            "abs_coefficient": abs(coefficient),
+        })
+
+    return pd.DataFrame(rows)
+
+
 
 
 def summarize_results(results_df, predictions_df, config):
@@ -204,7 +247,7 @@ def summarize_results(results_df, predictions_df, config):
     return summary
 
 
-def save_results(results_df, predictions_df, summary, config):
+def save_results(results_df, predictions_df, feature_importance_df, summary, config):
     """Save metrics and predictions for the finished experiment."""
     experiment_name = config["experiment"]["name"]
     output_dir = os.path.join("reports", "experiments", experiment_name)
@@ -213,6 +256,31 @@ def save_results(results_df, predictions_df, summary, config):
 
     results_df.to_csv(os.path.join(output_dir, "metrics_per_subject.csv"), index=False)
     predictions_df.to_csv(os.path.join(output_dir, "predictions.csv"), index=False)
+    if len(feature_importance_df) > 0:
+        feature_importance_df.to_csv(
+            os.path.join(output_dir, "feature_importance.csv"), index=False
+        )
+    target_column = config["data"]["target_column"]
+
+    task_metrics = compute_metrics_per_task(
+        predictions_df,
+        target_column
+    )
+
+    group_metrics = compute_metrics_per_group(
+        predictions_df,
+        target_column
+    )
+
+    pd.DataFrame(task_metrics).to_csv(
+        os.path.join(output_dir, "metrics_per_task.csv"),
+        index=False
+    )
+
+    pd.DataFrame(group_metrics).to_csv(
+        os.path.join(output_dir, "metrics_per_group.csv"),
+        index=False
+    )
 
     with open(os.path.join(output_dir, "metrics.json"), "w", encoding="utf-8") as file:
         json.dump(summary, file, indent=2)
@@ -231,9 +299,9 @@ def main():
     df = load_feature_table(config)
     validate_feature_table(df, config)
 
-    results_df, predictions_df = run_loso_training(df, config)
+    results_df, predictions_df, feature_importance_df = run_loso_training(df, config)
     summary = summarize_results(results_df, predictions_df, config)
-    save_results(results_df, predictions_df, summary, config)
+    save_results(results_df, predictions_df, feature_importance_df, summary, config)
 
     print("Mean balanced accuracy:", summary["mean_balanced_accuracy"])
     print("Mean F1:", summary["mean_f1"])

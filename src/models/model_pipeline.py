@@ -37,6 +37,7 @@ def build_classifier(config):
     model_config = config.get("model", {})
     model_type = model_config.get("type", "logistic_regression")
 
+    # Bandpower + LR
     if model_type == "logistic_regression":
         return LogisticRegression(
             class_weight=model_config.get("class_weight", "balanced"),
@@ -44,6 +45,7 @@ def build_classifier(config):
             max_iter=model_config.get("max_iter", 1000),
         )
 
+    # Bandpower + SVM
     if model_type == "linear_svm":
         return LinearSVC(
             class_weight=model_config.get("class_weight", "balanced"),
@@ -55,6 +57,10 @@ def build_classifier(config):
 
 
 def build_model_pipeline(config):
+    """
+    Pipeline:
+    Scaler -> Classifier -> ...
+    """
     steps = []
 
     scaler = build_scaler(config)
