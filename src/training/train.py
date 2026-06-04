@@ -14,6 +14,7 @@ from sklearn.metrics import roc_auc_score
 from sklearn.model_selection import LeaveOneGroupOut
 
 from src.models.model_pipeline import build_model_pipeline
+from src.evaluation.metrics import compute_metrics
 
 
 def load_config(config_path):
@@ -158,16 +159,10 @@ def run_loso_training(df, config):
             "test_subject": test_subject,
             "n_train": len(train_index),
             "n_test": len(test_index),
-            "balanced_accuracy": balanced_accuracy_score(y_test, y_pred),
-            "f1": f1_score(y_test, y_pred, zero_division=0),
-            "precision": precision_score(y_test, y_pred, zero_division=0),
-            "recall": recall_score(y_test, y_pred, zero_division=0),
         }
 
-        if y_score is not None and len(set(y_test)) == 2:
-            result["roc_auc"] = roc_auc_score(y_test, y_score)
-        else:
-            result["roc_auc"] = None
+        metrics = compute_metrics(y_test, y_pred, y_score)
+        result.update(metrics)
 
         fold_results.append(result)
 
