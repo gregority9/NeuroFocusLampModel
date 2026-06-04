@@ -1,5 +1,5 @@
 experiment:
-  name: bandpower_logreg
+  name: bandpower_svm
 
 data:
   input_file: data/processed/features_bandpower.csv
@@ -33,7 +33,7 @@ normalization:
   scaler: robust
 
 model:
-  type: logistic_regression
+  type: linear_svm
   class_weight: balanced
   C: 1.0
   max_iter: 1000

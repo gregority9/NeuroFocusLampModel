@@ -1,5 +1,3 @@
-"""Train EEG focus classifiers with Leave-One-Subject-Out validation."""
-
 import json
 import os
 import sys
@@ -27,10 +25,14 @@ def load_feature_table(config):
     input_file = config["data"]["input_file"]
     df = pd.read_csv(input_file)
 
-    # Optioanlly remove rejected windows
+    # Optionally remove rejected windows
     rejected_column = config["data"].get("rejected_column")
     if rejected_column in df.columns:
-        df = df[df[rejected_column] == False].copy()
+        if df[rejected_column].dtype == "object":
+            rejected = df[rejected_column].astype(str).str.lower()
+            df = df[rejected != "true"].copy()
+        else:
+            df = df[df[rejected_column] == False].copy()
 
     return df
 
@@ -45,6 +47,59 @@ def get_feature_columns(df, config):
             feature_columns.append(column)
 
     return feature_columns
+
+
+def validate_feature_table(df, config):
+    """
+    Are there any required columns?
+    Is there any data left after the is_rejected rejection?
+    Are there at least two people for RANDOM?
+    Are there at least two classes?
+    Are the labels 0 and 1?
+    Are there feature columns?
+    Do the features have no NaNs?
+    """
+    required_columns = config["data"].get("required_columns", []).copy()
+    target_column = config["data"]["target_column"]
+    group_column = config["validation"]["group_column"]
+
+    if target_column not in required_columns:
+        required_columns.append(target_column)
+
+    if group_column not in required_columns:
+        required_columns.append(group_column)
+
+    missing_columns = []
+    for column in required_columns:
+        if column not in df.columns:
+            missing_columns.append(column)
+
+    if len(missing_columns) > 0:
+        raise ValueError("Missing columns in feature table: " + str(missing_columns))
+
+    if len(df) == 0:
+        raise ValueError("Feature table is empty after filtering rejected windows.")
+
+    if df[group_column].nunique() < 2:
+        raise ValueError("LOSO validation needs at least two subjects.")
+
+    if df[target_column].nunique() < 2:
+        raise ValueError("Classification needs at least two labels.")
+
+    allowed_labels = config["data"].get("allowed_labels")
+    if allowed_labels is not None:
+        labels = set(df[target_column].dropna().unique())
+        allowed_labels = set(allowed_labels)
+
+        if labels != allowed_labels:
+            raise ValueError("Unexpected labels: " + str(labels))
+
+    feature_columns = get_feature_columns(df, config)
+    if len(feature_columns) == 0:
+        raise ValueError("No feature columns found.")
+
+    if df[feature_columns].isnull().any().any():
+        raise ValueError("Feature columns contain NaN values.")
 
 
 def get_prediction_scores(model, X_test):
@@ -179,6 +234,7 @@ def main():
 
     config = load_config(config_path)
     df = load_feature_table(config)
+    validate_feature_table(df, config)
 
     results_df, predictions_df = run_loso_training(df, config)
     summary = summarize_results(results_df, predictions_df, config)
