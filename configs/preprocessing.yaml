@@ -1,0 +1,33 @@
+project:
+  name: eeg_focus_classifier
+  random_state: 42
+
+data:
+  sampling_rate: 250
+  channels:
+    - AF3
+    - AF4
+    - F3
+    - F4
+    - FC5
+    - FC6
+    - O2
+    - O1
+  accel:
+    - Accel_x
+    - Accel_y
+    - Accel_z
+  subjects:
+    - 203
+    - 204
+    - 205
+    - 207
+    - 208
+    - 301
+    - 302
+    - 303
+    - 304
+  data_types:
+    - R
+    - TASK1
+    - TASK2
