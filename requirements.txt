@@ -1,3 +1,5 @@
 pandas
 mne
 PyYAML
+scikit-learn
+pytest
