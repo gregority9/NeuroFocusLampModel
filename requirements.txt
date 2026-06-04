@@ -1,3 +1,4 @@
 pandas
 mne
 PyYAML
+scikit-learn
