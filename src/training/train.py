@@ -1,16 +1,14 @@
-import json
-import os
 import sys
 
 import pandas as pd
 import yaml
 
-from sklearn.metrics import confusion_matrix
 from sklearn.model_selection import LeaveOneGroupOut
 
+from src.evaluation.metrics import compute_metrics
+from src.evaluation.reports import save_results
+from src.evaluation.reports import summarize_results
 from src.models.model_pipeline import build_model_pipeline
-from src.evaluation.metrics import compute_metrics, compute_metrics_by_column, compute_metrics_per_group, \
-    compute_metrics_per_task
 
 
 def load_config(config_path):
@@ -43,7 +41,66 @@ def get_feature_columns(df, config):
         if column not in metadata_columns:
             feature_columns.append(column)
 
+    feature_columns = apply_feature_filters(feature_columns, config)
+
     return feature_columns
+
+
+def feature_contains_channel(feature, channels):
+    feature_tokens = feature.replace("-", "_").split("_")
+
+    for channel in channels:
+        if channel in feature_tokens:
+            return True
+
+    return False
+
+
+def feature_contains_band(feature, bands):
+    feature_name = feature.lower()
+
+    for band in bands:
+        if band.lower() in feature_name:
+            return True
+
+    return False
+
+
+def apply_feature_filters(feature_columns, config):
+    """
+    Apply artifact-control feature filters from config.
+
+    This is used for experiments such as:
+    - no AF3/AF4,
+    - no high beta,
+    - only occipital channels,
+    - only frontal channels.
+    """
+    feature_config = config.get("features", {})
+
+    include_channels = feature_config.get("include_channels", [])
+    exclude_channels = feature_config.get("exclude_channels", [])
+    include_bands = feature_config.get("include_bands", [])
+    exclude_bands = feature_config.get("exclude_bands", [])
+
+    filtered_columns = []
+
+    for feature in feature_columns:
+        if len(include_channels) > 0 and not feature_contains_channel(feature, include_channels):
+            continue
+
+        if len(exclude_channels) > 0 and feature_contains_channel(feature, exclude_channels):
+            continue
+
+        if len(include_bands) > 0 and not feature_contains_band(feature, include_bands):
+            continue
+
+        if len(exclude_bands) > 0 and feature_contains_band(feature, exclude_bands):
+            continue
+
+        filtered_columns.append(feature)
+
+    return filtered_columns
 
 
 def validate_feature_table(df, config):
@@ -221,69 +278,6 @@ def extract_feature_importance(model, feature_columns, fold_id, test_subject):
 
     return pd.DataFrame(rows)
 
-
-
-
-def summarize_results(results_df, predictions_df, config):
-    """Aggregate fold-level results into one experiment summary."""
-    target_column = config["data"]["target_column"]
-
-    y_true = predictions_df[target_column]
-    y_pred = predictions_df["prediction"]
-
-    summary = {
-        "experiment": config["experiment"]["name"],
-        "mean_balanced_accuracy": results_df["balanced_accuracy"].mean(),
-        "std_balanced_accuracy": results_df["balanced_accuracy"].std(),
-        "mean_f1": results_df["f1"].mean(),
-        "mean_precision": results_df["precision"].mean(),
-        "mean_recall": results_df["recall"].mean(),
-        "confusion_matrix": confusion_matrix(y_true, y_pred).tolist(),
-    }
-
-    if "roc_auc" in results_df.columns:
-        summary["mean_roc_auc"] = results_df["roc_auc"].dropna().mean()
-
-    return summary
-
-
-def save_results(results_df, predictions_df, feature_importance_df, summary, config):
-    """Save metrics and predictions for the finished experiment."""
-    experiment_name = config["experiment"]["name"]
-    output_dir = os.path.join("reports", "experiments", experiment_name)
-
-    os.makedirs(output_dir, exist_ok=True)
-
-    results_df.to_csv(os.path.join(output_dir, "metrics_per_subject.csv"), index=False)
-    predictions_df.to_csv(os.path.join(output_dir, "predictions.csv"), index=False)
-    if len(feature_importance_df) > 0:
-        feature_importance_df.to_csv(
-            os.path.join(output_dir, "feature_importance.csv"), index=False
-        )
-    target_column = config["data"]["target_column"]
-
-    task_metrics = compute_metrics_per_task(
-        predictions_df,
-        target_column
-    )
-
-    group_metrics = compute_metrics_per_group(
-        predictions_df,
-        target_column
-    )
-
-    pd.DataFrame(task_metrics).to_csv(
-        os.path.join(output_dir, "metrics_per_task.csv"),
-        index=False
-    )
-
-    pd.DataFrame(group_metrics).to_csv(
-        os.path.join(output_dir, "metrics_per_group.csv"),
-        index=False
-    )
-
-    with open(os.path.join(output_dir, "metrics.json"), "w", encoding="utf-8") as file:
-        json.dump(summary, file, indent=2)
 
 
 def main():
