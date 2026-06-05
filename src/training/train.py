@@ -37,7 +37,10 @@ def should_reject_rejected_windows(config):
 
 def filter_rejected_windows(df, config):
     """Remove rejected windows when this is enabled in the config."""
-    if not should_reject_rejected_windows(config):
+    artifacts_config = config.get("artifacts", {})
+    reject_rejected_windows = artifacts_config.get("reject_rejected_windows", True)
+
+    if reject_rejected_windows == False:
         return df
 
     rejected_column = config["data"].get("rejected_column")
@@ -363,17 +366,25 @@ def save_model_artifacts(model, feature_columns, config, output_dir, input_forma
     with open(feature_columns_path, "w", encoding="utf-8") as file:
         json.dump(feature_columns, file, indent=2)
 
-    model_metadata = {
-        "experiment": config["experiment"]["name"],
-        "model_type": config.get("model", {}).get("type"),
-        "input_format": input_format,
-        "n_features": len(feature_columns),
-        "subject_relative_to_rest": config.get("normalization", {}).get(
+    model_metadata = {}
+    model_metadata["experiment"] = config["experiment"]["name"]
+    model_metadata["input_format"] = input_format
+    model_metadata["n_features"] = len(feature_columns)
+
+    if "model" in config:
+        model_metadata["model_type"] = config["model"].get("type")
+    else:
+        model_metadata["model_type"] = None
+
+    if "normalization" in config:
+        model_metadata["subject_relative_to_rest"] = config["normalization"].get(
             "subject_relative_to_rest",
             False
-        ),
-        "reject_rejected_windows": should_reject_rejected_windows(config),
-    }
+        )
+    else:
+        model_metadata["subject_relative_to_rest"] = False
+
+    model_metadata["reject_rejected_windows"] = should_reject_rejected_windows(config)
 
     with open(model_metadata_path, "w", encoding="utf-8") as file:
         json.dump(model_metadata, file, indent=2)

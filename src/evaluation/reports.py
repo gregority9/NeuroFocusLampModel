@@ -12,13 +12,6 @@ from src.evaluation.plots import save_confusion_matrix_plot
 from src.evaluation.plots import save_roc_curve_plot
 
 
-def get_experiment_output_dir(config):
-    """Return the output directory for one experiment."""
-    experiment_name = config["experiment"]["name"]
-
-    return os.path.join("reports", "experiments", experiment_name)
-
-
 def aggregate_feature_importance(feature_importance_df):
     """
     Aggregate feature coefficients across LOSO folds.
@@ -106,7 +99,8 @@ def compute_artifact_prediction_correlation(predictions_df, config):
 
 def save_results(results_df, predictions_df, feature_importance_df, summary, config):
     """Save metrics, predictions, plots, and report files for the experiment."""
-    output_dir = get_experiment_output_dir(config)
+    experiment_name = config["experiment"]["name"]
+    output_dir = os.path.join("reports", "experiments", experiment_name)
 
     os.makedirs(output_dir, exist_ok=True)
 
