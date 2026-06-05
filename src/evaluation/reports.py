@@ -2,6 +2,7 @@ import json
 import os
 
 import pandas as pd
+import yaml
 
 from sklearn.metrics import confusion_matrix
 
@@ -9,6 +10,13 @@ from src.evaluation.metrics import compute_metrics_per_group
 from src.evaluation.metrics import compute_metrics_per_task
 from src.evaluation.plots import save_confusion_matrix_plot
 from src.evaluation.plots import save_roc_curve_plot
+
+
+def get_experiment_output_dir(config):
+    """Return the output directory for one experiment."""
+    experiment_name = config["experiment"]["name"]
+
+    return os.path.join("reports", "experiments", experiment_name)
 
 
 def aggregate_feature_importance(feature_importance_df):
@@ -98,8 +106,7 @@ def compute_artifact_prediction_correlation(predictions_df, config):
 
 def save_results(results_df, predictions_df, feature_importance_df, summary, config):
     """Save metrics, predictions, plots, and report files for the experiment."""
-    experiment_name = config["experiment"]["name"]
-    output_dir = os.path.join("reports", "experiments", experiment_name)
+    output_dir = get_experiment_output_dir(config)
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -162,3 +169,8 @@ def save_results(results_df, predictions_df, feature_importance_df, summary, con
 
     with open(os.path.join(output_dir, "metrics.json"), "w", encoding="utf-8") as file:
         json.dump(summary, file, indent=2)
+
+    with open(os.path.join(output_dir, "config_used.yaml"), "w", encoding="utf-8") as file:
+        yaml.safe_dump(config, file, sort_keys=False)
+
+    return output_dir

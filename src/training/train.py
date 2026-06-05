@@ -1,5 +1,8 @@
+import json
+import os
 import sys
 
+import joblib
 import pandas as pd
 import yaml
 
@@ -20,16 +23,36 @@ def load_feature_table(config):
     input_file = config["data"]["input_file"]
     df = pd.read_csv(input_file)
 
-    # Optionally remove rejected windows
-    rejected_column = config["data"].get("rejected_column")
-    if rejected_column in df.columns:
-        if df[rejected_column].dtype == "object":
-            rejected = df[rejected_column].astype(str).str.lower()
-            df = df[rejected != "true"].copy()
-        else:
-            df = df[df[rejected_column] == False].copy()
+    df = filter_rejected_windows(df, config)
 
     return df
+
+
+def should_reject_rejected_windows(config):
+    """Decide if rejected windows should be removed before modeling."""
+    artifacts_config = config.get("artifacts", {})
+
+    return artifacts_config.get("reject_rejected_windows", True)
+
+
+def filter_rejected_windows(df, config):
+    """Remove rejected windows when this is enabled in the config."""
+    if not should_reject_rejected_windows(config):
+        return df
+
+    rejected_column = config["data"].get("rejected_column")
+
+    if rejected_column is None:
+        return df
+
+    if rejected_column not in df.columns:
+        return df
+
+    if df[rejected_column].dtype == "object":
+        rejected = df[rejected_column].astype(str).str.lower()
+        return df[~rejected.isin(["true", "1", "yes"])].copy()
+
+    return df[df[rejected_column] == False].copy()
 
 
 def get_feature_columns(df, config):
@@ -101,6 +124,58 @@ def apply_feature_filters(feature_columns, config):
         filtered_columns.append(feature)
 
     return filtered_columns
+
+
+def apply_subject_relative_to_rest(df, feature_columns, config):
+    """
+    Normalize features relative to each subject's own rest baseline.
+
+    This assumes that a rest recording is available for every subject.
+    For a new subject, this corresponds to a calibration recording.
+    """
+    normalization_config = config.get("normalization", {})
+
+    if not normalization_config.get("subject_relative_to_rest", False):
+        return df
+
+    subject_column = normalization_config.get(
+        "subject_column",
+        config["validation"].get("group_column", "subject_id")
+    )
+    task_column = normalization_config.get("task_column", "task")
+    rest_task = normalization_config.get("rest_task", "R")
+    epsilon = normalization_config.get("epsilon", 1e-8)
+
+    normalized_df = df.copy()
+    required_columns = [subject_column, task_column]
+    missing_columns = []
+
+    for column in required_columns:
+        if column not in normalized_df.columns:
+            missing_columns.append(column)
+
+    if len(missing_columns) > 0:
+        raise ValueError(
+            "Missing columns for subject-relative normalization: "
+            + str(missing_columns)
+        )
+
+    for subject in normalized_df[subject_column].unique():
+        subject_rows = normalized_df[subject_column] == subject
+        rest_rows = subject_rows & (normalized_df[task_column] == rest_task)
+
+        if rest_rows.sum() == 0:
+            raise ValueError("No rest baseline found for subject: " + str(subject))
+
+        rest_mean = normalized_df.loc[rest_rows, feature_columns].mean()
+        rest_std = normalized_df.loc[rest_rows, feature_columns].std()
+        rest_std = rest_std.replace(0, epsilon).fillna(epsilon)
+
+        normalized_df.loc[subject_rows, feature_columns] = (
+            normalized_df.loc[subject_rows, feature_columns] - rest_mean
+        ) / rest_std
+
+    return normalized_df
 
 
 def validate_feature_table(df, config):
@@ -175,7 +250,7 @@ def run_loso_training(df, config):
     """
     target_column = config["data"]["target_column"]
     group_column = config["validation"]["group_column"]
-    feature_columns = get_feature_columns(df, config)
+    df, feature_columns = prepare_model_data(df, config)
 
     X = df[feature_columns]
     y = df[target_column]
@@ -252,6 +327,58 @@ def run_loso_training(df, config):
 
     return results_df, predictions_df, feature_importance_df
 
+
+def prepare_model_data(df, config):
+    """Apply feature selection and model-level normalization."""
+    feature_columns = get_feature_columns(df, config)
+    df = apply_subject_relative_to_rest(df, feature_columns, config)
+
+    return df, feature_columns
+
+
+def train_final_model(df, config):
+    """Train one final model on all available rows after LOSO evaluation."""
+    target_column = config["data"]["target_column"]
+    df, feature_columns = prepare_model_data(df, config)
+
+    X = df[feature_columns]
+    y = df[target_column]
+
+    model = build_model_pipeline(config)
+    model.fit(X, y)
+
+    return model, feature_columns
+
+
+def save_model_artifacts(model, feature_columns, config, output_dir, input_format="feature_table"):
+    """Save the trained model and metadata needed for later prediction."""
+    os.makedirs(output_dir, exist_ok=True)
+
+    model_path = os.path.join(output_dir, "model.joblib")
+    feature_columns_path = os.path.join(output_dir, "feature_columns.json")
+    model_metadata_path = os.path.join(output_dir, "model_metadata.json")
+
+    joblib.dump(model, model_path)
+
+    with open(feature_columns_path, "w", encoding="utf-8") as file:
+        json.dump(feature_columns, file, indent=2)
+
+    model_metadata = {
+        "experiment": config["experiment"]["name"],
+        "model_type": config.get("model", {}).get("type"),
+        "input_format": input_format,
+        "n_features": len(feature_columns),
+        "subject_relative_to_rest": config.get("normalization", {}).get(
+            "subject_relative_to_rest",
+            False
+        ),
+        "reject_rejected_windows": should_reject_rejected_windows(config),
+    }
+
+    with open(model_metadata_path, "w", encoding="utf-8") as file:
+        json.dump(model_metadata, file, indent=2)
+
+
 def extract_feature_importance(model, feature_columns, fold_id, test_subject):
     """
    Extract feature coefficients from Logistic Regression.
@@ -295,7 +422,10 @@ def main():
 
     results_df, predictions_df, feature_importance_df = run_loso_training(df, config)
     summary = summarize_results(results_df, predictions_df, config)
-    save_results(results_df, predictions_df, feature_importance_df, summary, config)
+    output_dir = save_results(results_df, predictions_df, feature_importance_df, summary, config)
+
+    final_model, feature_columns = train_final_model(df, config)
+    save_model_artifacts(final_model, feature_columns, config, output_dir)
 
     print("Mean balanced accuracy:", summary["mean_balanced_accuracy"])
     print("Mean F1:", summary["mean_f1"])

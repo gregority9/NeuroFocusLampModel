@@ -7,6 +7,7 @@ from src.evaluation.reports import save_results
 from src.evaluation.reports import summarize_results
 from src.models.model_pipeline import build_model_pipeline
 from src.training.train import extract_feature_importance
+from src.training.train import apply_subject_relative_to_rest
 from src.training.train import get_feature_columns
 from src.training.train import get_prediction_scores
 from src.training.train import load_config
@@ -51,6 +52,7 @@ def run_task_transfer(df, config, train_task, test_task):
     """
     target_column = config["data"]["target_column"]
     feature_columns = get_feature_columns(df, config)
+    df = apply_subject_relative_to_rest(df, feature_columns, config)
 
     train_df, test_df = select_transfer_data(df, train_task, test_task)
     validate_task_transfer_data(train_df, test_df, target_column)
@@ -144,7 +146,6 @@ def main():
     print("Task-transfer experiment:", transfer_config["experiment"]["name"])
     print("Mean balanced accuracy:", summary["mean_balanced_accuracy"])
     print("Mean F1:", summary["mean_f1"])
-
 
 if __name__ == "__main__":
     main()
