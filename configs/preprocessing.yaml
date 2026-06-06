@@ -4,6 +4,7 @@ project:
 
 data:
   sampling_rate: 250
+  sample_column: sample_number
   channels:
     - AF3
     - AF4
@@ -31,3 +32,83 @@ data:
     - R
     - TASK1
     - TASK2
+
+validation:
+  time: 
+    expected:
+      R: 180
+      TASK1: 60
+      TASK2: 60
+    
+    tolerance:
+      R:
+        ok_min: 177
+        ok_max: 183
+        warning_min: 175
+        warning_max: 185
+
+      TASK1:
+        ok_min: 57
+        ok_max: 64
+        warning_min: 55
+        warning_max: 65
+
+      TASK2:
+        ok_min: 57
+        ok_max: 64
+        warning_min: 55
+        warning_max: 65
+  
+  samples:
+    expected: 250
+    tolerance:
+      ok_min: 249.9
+      ok_max: 252
+filters:
+  high_pass: 1.0
+  low_pass: 40.0
+  notch: 50.0
+  mne_verbose: ERROR
+
+reference:
+  method: common_average
+  possible_methods:
+  - none
+  - common_average
+  - average_good_channels
+
+accelerometer:
+  motion_score:
+    method: rolling_mean_delta
+    window_sec: 1.0
+
+  artifact_detection:
+    threshold_method: median_mad
+    mad_multiplier: 5.0
+    min_threshold: 0.2
+    max_threshold: 2.0
+
+artifacts:
+  robust_zscore:
+    mad_zero_score: 0.0
+  detection:
+    threshold: 5.0
+    combine_method: max
+  columns:
+    eeg_amplitude_raw: eeg_amplitude_raw
+    eeg_amplitude_score: eeg_amplitude_score
+    eeg_jump_raw: eeg_jump_raw
+    eeg_jump_score: eeg_jump_score
+    motion_artifact_score: motion_artifact_score
+    artifact_score: artifact_score
+    is_artifact: is_artifact
+
+labels:
+  R: 0
+  TASK1: 1
+  TASK2: 1
+
+output:
+  base_dir: data/processed/preprocessing
+  combined_filename: preprocessed_all.csv
+  manifest_filename: manifest.json
