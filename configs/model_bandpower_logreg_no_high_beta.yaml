@@ -1,0 +1,45 @@
+experiment:
+  name: bandpower_logreg_no_high_beta
+
+data:
+  input_file: data/processed/features_bandpower.csv
+  target_column: label
+  group_column: subject_id
+  rejected_column: is_rejected
+  allowed_labels:
+    - 0
+    - 1
+  required_columns:
+    - subject_id
+    - session_id
+    - group
+    - task
+    - label
+    - artifact_score
+    - is_rejected
+  metadata_columns:
+    - subject_id
+    - session_id
+    - group
+    - task
+    - label
+    - artifact_score
+    - is_rejected
+
+features:
+  type: bandpower
+  exclude_bands:
+    - high_beta
+
+normalization:
+  scaler: robust
+
+model:
+  type: logistic_regression
+  class_weight: balanced
+  C: 1.0
+  max_iter: 1000
+
+validation:
+  strategy: leave_one_subject_out
+  group_column: subject_id

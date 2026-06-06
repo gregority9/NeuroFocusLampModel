@@ -1,3 +1,9 @@
 pandas
 mne
 PyYAML
+scikit-learn
+pytest
+matplotlib
+numpy
+pyriemann
+joblib

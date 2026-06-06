@@ -1,0 +1,30 @@
+experiment:
+  name: riemannian_logreg
+
+data:
+  covariance_file: data/processed/covariance_matrices.npy
+  metadata_file: data/processed/windows_metadata.csv
+  target_column: label
+  group_column: subject_id
+  rejected_column: is_rejected
+  required_columns:
+    - subject_id
+    - session_id
+    - group
+    - task
+    - label
+    - artifact_score
+    - is_rejected
+
+riemannian:
+  metric: riemann
+
+model:
+  type: riemannian_logreg
+  class_weight: balanced
+  C: 1.0
+  max_iter: 1000
+
+validation:
+  strategy: leave_one_subject_out
+  group_column: subject_id
