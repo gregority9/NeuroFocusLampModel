@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from eeg_focus.io.config import ConfigLoader
+from src.eeg_focus.io.config import ConfigLoader
 
 
 class Artifacts:

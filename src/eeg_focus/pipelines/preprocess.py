@@ -3,15 +3,15 @@ from pathlib import Path
 
 import pandas as pd
 
-from eeg_focus.io.config import ConfigLoader
-from eeg_focus.io.loaders import FileLoader
-from eeg_focus.io.validators import Validator
-from eeg_focus.preprocessing.accelerometer import Accelerometer
-from eeg_focus.preprocessing.artifacts import Artifacts
-from eeg_focus.preprocessing.filters import Filters
-from eeg_focus.preprocessing.modalities import Modalities
-from eeg_focus.preprocessing.qc import QualityControl
-from eeg_focus.preprocessing.referencing import Referencing
+from src.eeg_focus.io.config import ConfigLoader
+from src.eeg_focus.io.loaders import FileLoader
+from src.eeg_focus.io.validators import Validator
+from src.eeg_focus.preprocessing.accelerometer import Accelerometer
+from src.eeg_focus.preprocessing.artifacts import Artifacts
+from src.eeg_focus.preprocessing.filters import Filters
+from src.eeg_focus.preprocessing.modalities import Modalities
+from src.eeg_focus.preprocessing.qc import QualityControl
+from src.eeg_focus.preprocessing.referencing import Referencing
 
 
 class PreprocessingPipeline:
@@ -19,7 +19,7 @@ class PreprocessingPipeline:
         self.config_loader = ConfigLoader(config_path)
         self.config = self.config_loader.get()
 
-        self.file_loader = FileLoader()
+        self.file_loader = FileLoader(self.config)
         self.validator = Validator(self.config)
         self.modalities = Modalities(self.config)
         self.referencing = Referencing(self.config)
@@ -91,11 +91,16 @@ class PreprocessingPipeline:
 
     def _process_one(self, subject, datatype, label, sample_column):
         df = self.file_loader.get_file(subject, datatype)
-        self.validator.ValidateData(df, datatype)
+        df = self.validator.validate_data(df, datatype)
+
+        raw_report = self.quality_control.run(df, subject, datatype)
+        bad_channels = []
+        if self.config["reference"].get("exclude_bad_channels", True):
+            bad_channels = self.quality_control.get_bad_eeg_channels(raw_report)
 
         df_eeg, df_accel = self.modalities.separate_eeg_accelerometer(df)
 
-        referenced_eeg_df = self.referencing.applyReferencing(df_eeg)
+        referenced_eeg_df = self.referencing.apply_referencing(df_eeg, bad_channels)
         filtered_eeg_df = self.filters.apply_filters(referenced_eeg_df)
         processed_accel_df = self.accelerometer.run(df_accel)
         artifact_df = self.artifacts.run(filtered_eeg_df, processed_accel_df)
@@ -114,6 +119,13 @@ class PreprocessingPipeline:
         result_df.insert(1, "datatype", datatype)
         result_df.insert(2, "label", label)
 
-        report = self.quality_control.run(result_df, subject, datatype)
+        post_report = self.quality_control.run(result_df, subject, datatype)
+        report = {
+            "subject": subject,
+            "datatype": datatype,
+            "raw_qc": raw_report,
+            "post_qc": post_report,
+            "bad_channels_used_for_reference": bad_channels,
+        }
 
         return result_df, report

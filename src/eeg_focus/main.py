@@ -1,4 +1,4 @@
-from eeg_focus.pipelines.preprocess import PreprocessingPipeline
+from src.eeg_focus.pipelines.preprocess import PreprocessingPipeline
 
 preprocessing_pipeline = PreprocessingPipeline()
 

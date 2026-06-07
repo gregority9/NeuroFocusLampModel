@@ -7,19 +7,29 @@ class Validator:
         self.config = config or ConfigLoader().get()
 
     def ValidateData(self, df, datatype):
+        return self.validate_data(df, datatype)
+
+    def validate_data(self, df, datatype):
         eeg_channels = self.config["data"]["channels"]
         accel_channels = self.config["data"]["accel"]
         sample_column = self.config["data"]["sample_column"]
 
-        all_channels = eeg_channels + accel_channels + [sample_column]
+        all_channels = eeg_channels + accel_channels + [sample_column, "timestamp_utc"]
 
         missing = [ch for ch in all_channels if ch not in df.columns]
 
         if missing:
             raise ValueError(f"There are missing channels in CSV: {missing}")
-        
-        df["timestamp_utc"] = pd.to_datetime(df["timestamp_utc"], utc=True)
-        delta = max(df["timestamp_utc"]) - min(df["timestamp_utc"])
+
+        validated_df = df.copy()
+        validated_df["timestamp_utc"] = pd.to_datetime(
+            validated_df["timestamp_utc"],
+            utc=True,
+        )
+        delta = (
+            validated_df["timestamp_utc"].max()
+            - validated_df["timestamp_utc"].min()
+        )
 
         expected = self.config["validation"]["time"]["expected"][datatype]
 
@@ -34,7 +44,7 @@ class Validator:
         else:
             raise ValueError(f"Wrong time in dataframe, expected: {expected}, actual: {delta.total_seconds()}")
 
-        n_samples = len(df)
+        n_samples = len(validated_df)
 
         samples_per_second = n_samples / delta.total_seconds()
 
@@ -49,3 +59,5 @@ class Validator:
                 "Wrong number of samples per second, "
                 f"expected: {expected_samples}, actual: {samples_per_second}"
             )
+
+        return validated_df

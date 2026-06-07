@@ -1,0 +1,19 @@
+{
+  "experiment": "bandpower_logreg",
+  "mean_balanced_accuracy": 0.4665619028894995,
+  "std_balanced_accuracy": 0.10399040901409831,
+  "mean_f1": 0.5337967761794236,
+  "mean_precision": 0.39087393519160907,
+  "mean_recall": 0.8518317384517619,
+  "confusion_matrix": [
+    [
+      52,
+      645
+    ],
+    [
+      72,
+      415
+    ]
+  ],
+  "mean_roc_auc": 0.5011445372748784
+}

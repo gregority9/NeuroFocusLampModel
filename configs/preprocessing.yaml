@@ -3,7 +3,10 @@ project:
   random_state: 42
 
 data:
+  raw_base_path: data/raw
+  raw_file_pattern: "Subject{subject}/S{subject}_{datatype}_ALL_DATA.csv"
   sampling_rate: 250
+  eeg_input_unit: microvolts
   sample_column: sample_number
   channels:
     - AF3
@@ -71,11 +74,12 @@ filters:
   mne_verbose: ERROR
 
 reference:
-  method: common_average
+  method: average_good_channels
   possible_methods:
   - none
   - common_average
   - average_good_channels
+  exclude_bad_channels: true
 
 accelerometer:
   motion_score:

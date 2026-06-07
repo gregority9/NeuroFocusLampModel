@@ -39,8 +39,8 @@ class ExperimentRunner:
         first_command.append("-m")
         first_command.append("src.evaluation.task_transfer")
         first_command.append("configs/model_bandpower_logreg.yaml")
-        first_command.append("memory")
-        first_command.append("words")
+        first_command.append("TASK1")
+        first_command.append("TASK2")
         self.commands.append(first_command)
 
         second_command = []
@@ -48,8 +48,8 @@ class ExperimentRunner:
         second_command.append("-m")
         second_command.append("src.evaluation.task_transfer")
         second_command.append("configs/model_bandpower_logreg.yaml")
-        second_command.append("words")
-        second_command.append("memory")
+        second_command.append("TASK2")
+        second_command.append("TASK1")
         self.commands.append(second_command)
 
     def add_riemannian_command(self):

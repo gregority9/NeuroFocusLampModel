@@ -1,0 +1,19 @@
+{
+  "experiment": "bandpower_logreg_train_task2_test_task1",
+  "mean_balanced_accuracy": 0.5596212576721813,
+  "std_balanced_accuracy": NaN,
+  "mean_f1": 0.3971223021582734,
+  "mean_precision": 0.3039647577092511,
+  "mean_recall": 0.5726141078838174,
+  "confusion_matrix": [
+    [
+      381,
+      316
+    ],
+    [
+      103,
+      138
+    ]
+  ],
+  "mean_roc_auc": 0.5725962482958975
+}

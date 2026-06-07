@@ -1,4 +1,4 @@
-from eeg_focus.io.config import ConfigLoader
+from src.eeg_focus.io.config import ConfigLoader
 
 import numpy as np
 import pandas as pd
@@ -33,6 +33,21 @@ class QualityControl:
         self._add_warnings(report)
 
         return report
+
+    def get_bad_eeg_channels(self, report):
+        bad = report.get("bad_channel_candidates", {})
+        channels = set()
+
+        for key in [
+            "flat_channels",
+            "low_variance_channels",
+            "high_variance_channels",
+            "high_nan_channels",
+            "non_finite_channels",
+        ]:
+            channels.update(bad.get(key, []))
+
+        return sorted(channels)
 
     def _channel_stats(self, df, channels):
         stats = {}

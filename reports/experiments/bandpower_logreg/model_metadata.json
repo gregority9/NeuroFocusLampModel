@@ -1,0 +1,8 @@
+{
+  "experiment": "bandpower_logreg",
+  "input_format": "feature_table",
+  "n_features": 32,
+  "model_type": "logistic_regression",
+  "subject_relative_to_rest": false,
+  "reject_rejected_windows": true
+}

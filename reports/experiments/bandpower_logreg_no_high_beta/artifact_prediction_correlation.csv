@@ -1,0 +1,3 @@
+artifact_column,prediction_column,correlation,n_windows
+artifact_score,prediction,-0.10893723175356398,1184
+artifact_score,prediction_score,0.09014980931925012,1184

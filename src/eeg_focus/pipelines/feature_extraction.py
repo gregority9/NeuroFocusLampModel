@@ -2,7 +2,7 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-from eeg_focus.features.bandpower import BandpowerExtractor
+from src.eeg_focus.features.bandpower import BandpowerExtractor
 
 
 class FeatureExtractionPipeline:

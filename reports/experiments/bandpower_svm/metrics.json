@@ -1,0 +1,19 @@
+{
+  "experiment": "bandpower_svm",
+  "mean_balanced_accuracy": 0.47487761308335297,
+  "std_balanced_accuracy": 0.07697486781993795,
+  "mean_f1": 0.5407096017938287,
+  "mean_precision": 0.39834394809342666,
+  "mean_recall": 0.8553179737291848,
+  "confusion_matrix": [
+    [
+      60,
+      637
+    ],
+    [
+      69,
+      418
+    ]
+  ],
+  "mean_roc_auc": 0.45601953218853325
+}

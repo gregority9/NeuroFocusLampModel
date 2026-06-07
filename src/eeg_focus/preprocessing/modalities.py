@@ -1,4 +1,4 @@
-from eeg_focus.io.config import ConfigLoader
+from src.eeg_focus.io.config import ConfigLoader
 
 class Modalities:
     def __init__(self, config=None):

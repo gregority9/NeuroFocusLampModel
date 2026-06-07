@@ -1,4 +1,4 @@
-from eeg_focus.io.config import ConfigLoader
+from src.eeg_focus.io.config import ConfigLoader
 from .mne_utils import MneUtils
 
 class Filters:
@@ -15,7 +15,9 @@ class Filters:
         sample_column = self.config["data"]["sample_column"]
         sampling_rate = self.config["data"]["sampling_rate"]
 
-        eeg_signals = eeg_df[eeg_channels] * 1e-6
+        input_unit = self.config["data"].get("eeg_input_unit", "microvolts")
+        unit_scale = self._unit_scale_to_volts(input_unit)
+        eeg_signals = eeg_df[eeg_channels] * unit_scale
 
         ch_types = ["eeg"] * len(eeg_channels)
         eeg_signals = eeg_signals.T.to_numpy(copy=True)
@@ -37,6 +39,17 @@ class Filters:
         filtered_df[eeg_channels] = filtered
 
         return filtered_df
+
+    def _unit_scale_to_volts(self, input_unit):
+        match input_unit:
+            case "volts":
+                return 1.0
+            case "millivolts":
+                return 1e-3
+            case "microvolts":
+                return 1e-6
+            case _:
+                raise ValueError(f"Unsupported EEG input unit: {input_unit}")
 
 
 

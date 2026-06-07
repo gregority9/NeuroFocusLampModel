@@ -1,0 +1,4 @@
+task,n_windows,true_labels,mean_prediction,correct_detection_rate,expected_class
+R,812,[np.int64(0)],0.8300492610837439,0.16995073891625614,0
+TASK1,270,[np.int64(1)],0.774074074074074,0.774074074074074,1
+TASK2,270,[np.int64(1)],0.8888888888888888,0.8888888888888888,1

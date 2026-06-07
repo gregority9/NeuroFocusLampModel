@@ -1,4 +1,4 @@
-from eeg_focus.io.config import ConfigLoader
+from src.eeg_focus.io.config import ConfigLoader
 
 import numpy as np
 
@@ -16,6 +16,7 @@ class Accelerometer:
         motion_cfg = acc_cfg["motion_score"]
         artifact_cfg = acc_cfg["artifact_detection"]
 
+        method = artifact_cfg.get("threshold_method", "median_mad")
         window_sec = motion_cfg["window_sec"]
         mad_multiplier = artifact_cfg["mad_multiplier"]
         min_threshold = artifact_cfg.get("min_threshold", None)
@@ -39,16 +40,11 @@ class Accelerometer:
             .mean()
         )
 
-        median_motion = accel_only["motion_score"].median()
-
-        mad_motion = (
-            accel_only["motion_score"]
-            .sub(median_motion)
-            .abs()
-            .median()
+        threshold = self._calculate_threshold(
+            accel_only["motion_score"],
+            method,
+            mad_multiplier,
         )
-
-        threshold = median_motion + mad_multiplier * mad_motion
 
         if min_threshold is not None:
             threshold = max(threshold, min_threshold)
@@ -71,3 +67,12 @@ class Accelerometer:
         result_df["is_motion_artifact"] = accel_only["is_motion_artifact"]
 
         return result_df
+
+    def _calculate_threshold(self, motion_score, method, mad_multiplier):
+        match method:
+            case "median_mad":
+                median_motion = motion_score.median()
+                mad_motion = motion_score.sub(median_motion).abs().median()
+                return median_motion + mad_multiplier * mad_motion
+            case _:
+                raise ValueError(f"Unsupported accelerometer threshold method: {method}")

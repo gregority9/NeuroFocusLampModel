@@ -39,7 +39,7 @@ model:
   type: logistic_regression
   class_weight: balanced
   C: 1.0
-  max_iter: 1000
+  max_iter: 10000
 
 validation:
   strategy: leave_one_subject_out
