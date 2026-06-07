@@ -1,322 +1,341 @@
 # EEG Focus Classifier
 
-EEG Focus Classifier is a research-oriented Python project for building a
-modular offline pipeline that distinguishes resting-state EEG from EEG recorded
-during cognitive tasks.
+Pipeline do klasyfikacji okien EEG na stan spoczynku (`rest`, etykieta `0`) oraz zadanie poznawcze (`task`, etykieta `1`). Projekt jest częścią prac FocusLamp i służy do eksperymentów offline na danych BrainAccess Mini.
 
-The current methodological target is deliberately conservative:
+Model nie jest klasyfikatorem klinicznym ADHD. Zmienna `ADHD/control` jest używana do raportowania i analizy, a nie jako główny target predykcji.
 
-```text
-resting state vs cognitive engagement
-```
+## Dane
 
-The project should not be interpreted as a clinical ADHD classifier or as a
-direct psychological measurement of "focus". At this stage, the model learns to
-separate rest recordings from task recordings under a controlled experimental
-setup.
+Zbiór zawiera nagrania od 9 osób:
 
-## Project Overview
+- 5 osób z grupy ADHD,
+- 4 osoby z grupy kontrolnej.
 
-The project uses EEG recordings from 9 participants:
+Każdy uczestnik ma trzy warunki eksperymentalne:
 
-```text
-5 participants with ADHD
-4 control participants
-```
+- `R` - rest, 180 sekund,
+- `TASK1` - zadanie pamięciowe/liczenie w pamięci, 60 sekund,
+- `TASK2` - zadanie słowne/generowanie słów na literę, 60 sekund.
 
-Each participant has recordings from:
-
-```text
-rest
-cognitive task 1
-cognitive task 2
-```
-
-The EEG montage contains 8 channels:
+Sygnał EEG pochodzi z 8 kanałów:
 
 ```text
 AF3, AF4, F3, F4, FC5, FC6, O1, O2
 ```
 
-The intended sampling rate is:
+Częstotliwość próbkowania: `250 Hz`.
 
-```text
-250 Hz
-```
-
-ADHD/control status is treated as a grouping and reporting variable, not as the
-main prediction target.
-
-## Methodological Principles
-
-The most important methodological rule is to avoid leakage between train and
-test data.
-
-EEG windows from the same participant are strongly dependent. Therefore, the
-project must not use random window-level train/test splits such as:
-
-```python
-train_test_split(X_windows, y_windows)
-```
-
-The main validation strategy is:
-
-```text
-Leave-One-Subject-Out Cross-Validation
-```
-
-In each fold:
-
-```text
-train: all participants except one
-test: the held-out participant
-```
-
-This makes the evaluation stricter and better aligned with the real question:
-whether the model generalizes to a new person.
-
-## Pipeline
-
-The full planned research pipeline is:
-
-```text
-raw EEG data
--> preprocessing
--> windowing
--> feature extraction
--> modeling
--> evaluation
--> reports
-```
-
-Each stage should have clear inputs, outputs, and configuration files. The
-project is intentionally designed as a modular pipeline rather than a single
-one-off notebook.
-
-## Current Modeling Scope
-
-The current modeling code focuses on the first classical baselines:
-
-```text
-Bandpower features + Logistic Regression
-Bandpower features + Linear SVM
-```
-
-The main training script uses scikit-learn pipelines:
-
-```text
-scaler -> classifier
-```
-
-This ensures that scaling is fitted only on the training data inside each
-cross-validation fold.
-
-Planned future modeling work includes:
-
-```text
-Covariance matrices -> Tangent Space -> Logistic Regression
-subject-relative normalization based on rest baseline
-task-transfer validation
-artifact-control experiments
-```
-
-## Feature Table Contract
-
-The modeling pipeline expects a ready feature table from the feature extraction
-stage. It does not create EEG features by itself.
-
-Default input:
-
-```text
-data/processed/features_bandpower.csv
-```
-
-Required metadata columns:
-
-```text
-subject_id
-session_id
-group
-task
-label
-artifact_score
-is_rejected
-```
-
-All remaining columns are interpreted as model features.
-
-Example feature columns:
-
-```text
-alpha_O1
-alpha_O2
-theta_F3
-theta_F4
-beta_F3
-beta_F4
-theta_beta_F3
-theta_beta_F4
-```
-
-Labels:
-
-```text
-0 = rest
-1 = cognitive task
-```
-
-The full contract is described in:
-
-```text
-docs/feature_table_contract.md
-```
-
-## Repository Structure
-
-Current important files and directories:
+## Struktura Projektu
 
 ```text
 configs/
-  preprocessing.yaml
-  model_bandpower_logreg.yaml
-  model_bandpower_svm.yaml
+  base/                         # bazowe configi z dziedziczeniem
+  benchmarks/                   # definicje siatek benchmarkowych
+  model_*.yaml                  # krótkie override'y konkretnych eksperymentów
 
 data/
-  raw/
+  raw/                          # surowe dane uczestników
+  processed/                    # dane po preprocessingu i feature table
 
 docs/
-  eeg_focus_classifier_project_plan.md
-  podzial_zadan_eeg_focus_classifier.md
+  Dokumentacja Projektu - EEG Focus Classifier.txt
+  Dokumentacja Projektu - EEG Focus Classifier.docx
   feature_table_contract.md
 
+reports/
+  experiments/                  # wyniki pojedynczych eksperymentów
+  benchmarks/                   # manifesty i top-rankingi benchmarków
+
 src/
-  preprocessing/
-  models/
-  training/
-
-requirements.txt
-README.md
+  eeg_focus/                    # preprocessing i ekstrakcja cech
+  models/                       # budowa sklearn Pipeline
+  training/                     # trening LOSO i config loader
+  evaluation/                   # metryki, raporty, benchmark runner
 ```
 
-Expected future directories:
+## Instalacja
 
-```text
-data/interim/
-data/processed/
-reports/qc/
-reports/figures/
-reports/experiments/
-tests/
-```
+Linux/WSL:
 
-## Installation
-
-Create and activate a Python virtual environment:
-
-```powershell
+```bash
 python -m venv .venv
-.venv\Scripts\activate
-```
-
-Install dependencies:
-
-```powershell
+source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Current core dependencies:
-
-```text
-pandas
-mne
-PyYAML
-scikit-learn
-```
-
-Additional dependencies may be added later for Riemannian models, plotting, and
-automated reports.
-
-## Running Experiments
-
-After the feature table is available at:
-
-```text
-data/processed/features_bandpower.csv
-```
-
-run the logistic regression baseline:
+Windows PowerShell:
 
 ```powershell
-python -m src.training.train configs/model_bandpower_logreg.yaml
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 ```
 
-run the linear SVM baseline:
+W dalszych komendach zakładamy, że środowisko jest aktywne.
 
-```powershell
-python -m src.training.train configs/model_bandpower_svm.yaml
+## Pełny Workflow
+
+### 1. Preprocessing
+
+```bash
+python -m src.eeg_focus.main
 ```
 
-Experiment outputs are saved to:
+Co robi:
+
+- ładuje pliki surowe z `data/raw`,
+- waliduje długości i strukturę nagrań,
+- filtruje EEG zgodnie z `configs/preprocessing.yaml`,
+- liczy artefakty EEG/ruchowe,
+- zapisuje wynik do `data/processed/preprocessing/preprocessed_all.csv`.
+
+### 2. Ekstrakcja Cech
+
+Projekt nie ma osobnego CLI dla feature extraction, więc etap odpalamy przez klasę pipeline'u:
+
+```bash
+python -B - <<'PY'
+import yaml
+from src.eeg_focus.pipelines.feature_extraction import FeatureExtractionPipeline
+
+with open('configs/preprocessing.yaml', encoding='utf-8') as file:
+    config = yaml.safe_load(file)
+
+pipeline = FeatureExtractionPipeline(config)
+result = pipeline.run('data/processed/preprocessing/preprocessed_all.csv')
+print(result)
+PY
+```
+
+Co robi:
+
+- dzieli sygnał na okna 2-sekundowe,
+- liczy bandpower dla pasm `delta`, `theta`, `alpha`, `beta`,
+- dodaje cechy pochodne: `log_bandpower`, `ratios`, `regional`, `asymmetry`,
+- zapisuje `data/processed/features_bandpower.csv`.
+
+Szybki sanity check:
+
+```bash
+python -B - <<'PY'
+import pandas as pd
+
+df = pd.read_csv('data/processed/features_bandpower.csv', nrows=1)
+print('columns:', len(df.columns))
+print('log_theta_AF3' in df.columns)
+print('ratio_theta_over_alpha_AF3' in df.columns)
+print('theta_frontal_mean' in df.columns)
+print('asym_alpha_F3_minus_F4' in df.columns)
+PY
+```
+
+Po aktualnej ekstrakcji tabela ma `175` kolumn.
+
+## Trening Pojedynczego Modelu
+
+Baseline logistic regression:
+
+```bash
+env MPLCONFIGDIR=/tmp/mplconfig python -B -m src.training.train configs/model_bandpower_logreg.yaml
+```
+
+Linear SVM:
+
+```bash
+env MPLCONFIGDIR=/tmp/mplconfig python -B -m src.training.train configs/model_bandpower_svm.yaml
+```
+
+Wariant z pełnym zestawem feature groups:
+
+```bash
+env MPLCONFIGDIR=/tmp/mplconfig python -B -m src.training.train configs/model_features_all_logreg.yaml
+```
+
+Wyniki pojedynczego eksperymentu zapisują się do:
 
 ```text
-reports/experiments/{experiment_name}/
+reports/experiments/<experiment_name>/
 ```
 
-Expected files:
+Najważniejsze pliki w katalogu eksperymentu:
 
 ```text
-metrics.json
-metrics_per_subject.csv
-predictions.csv
+metrics.json                  # główne metryki
+config_used.yaml              # pełny config po merge'u
+metrics_per_subject.csv       # wyniki LOSO per osoba
+metrics_per_task.csv          # wyniki per R/TASK1/TASK2
+metrics_per_group.csv         # wyniki per ADHD/control
+predictions.csv               # predykcje per okno
+confusion_matrix.png          # macierz pomyłek
+roc_curve.png                 # krzywa ROC
+model.joblib                  # finalny model na całości danych
+model_metadata.json           # metadane modelu
 ```
 
-## Evaluation Metrics
+## Benchmark 300 Kombinacji
 
-The baseline training pipeline reports:
+Definicja benchmarku:
 
 ```text
-balanced accuracy
-F1-score
-precision
-recall
-ROC-AUC
-confusion matrix
-per-subject metrics
+configs/benchmarks/features_models_full.yaml
 ```
 
-Future reports should also include:
+Siatka obejmuje:
+
+- 10 zestawów cech,
+- 5 modeli,
+- 3 warianty normalizacji,
+- 2 tryby artefaktów.
+
+Łącznie:
 
 ```text
-metrics per task
-metrics per ADHD/control group
-confusion matrix plots
-ROC curves
-feature importance
-experiment notes
+10 x 5 x 3 x 2 = 300 eksperymentów
 ```
 
-## Artifact Controls
+Uruchomienie benchmarku:
 
-Because frontal EEG channels can capture eye movements, facial muscle activity,
-jaw tension, and speech-related artifacts, model results must be interpreted
-carefully.
+```bash
+env MPLCONFIGDIR=/tmp/mplconfig python -B -m src.evaluation.run_benchmark configs/benchmarks/features_models_full.yaml
+```
 
-Planned control experiments include:
+Runner jest wznawialny. Jeśli eksperyment ma już `metrics.json`, zostanie pominięty.
+
+Wymuszenie przeliczenia wszystkiego od zera:
+
+```bash
+env MPLCONFIGDIR=/tmp/mplconfig python -B -m src.evaluation.run_benchmark configs/benchmarks/features_models_full.yaml --force
+```
+
+Testowe odpalenie pierwszych N eksperymentów:
+
+```bash
+env MPLCONFIGDIR=/tmp/mplconfig python -B -m src.evaluation.run_benchmark configs/benchmarks/features_models_full.yaml --limit 5
+```
+
+Manifest benchmarku:
 
 ```text
-training without AF3/AF4
-training without the 30-40 Hz band
-training only on O1/O2
-training only on frontal channels
-correlation between artifact_score and model predictions
-comparison before and after artifact rejection
+reports/benchmarks/features_models_full_manifest.json
 ```
 
-These checks are necessary to determine whether the model is learning EEG
-patterns related to task engagement or mostly artifacts.
+Zbiorcza tabela wszystkich eksperymentów:
 
-## Notes
+```text
+reports/experiments/comparison.csv
+```
 
-This project is intended for academic experimentation and method development.
-It is not a medical diagnostic system and should not be used for clinical
-decision-making.
+Podgląd top 20:
+
+```bash
+python -B - <<'PY'
+import pandas as pd
+
+df = pd.read_csv('reports/experiments/comparison.csv')
+print(df.head(20).to_string(index=False))
+PY
+```
+
+## Top 15 Benchmarku
+
+Top 15 opcji zapisano w:
+
+```text
+reports/benchmarks/features_models_full_top15/
+```
+
+W tym katalogu są:
+
+```text
+README.md
+top15_summary.csv
+01_<experiment>/
+02_<experiment>/
+...
+15_<experiment>/
+```
+
+Najlepszy wariant:
+
+```text
+feature_set: regional
+model: random_forest
+normalization: subject_relative
+artifacts: reject
+balanced accuracy: 0.7537
+F1: 0.6527
+ROC AUC: 0.8117
+```
+
+## Aktualne Wnioski Z Benchmarku
+
+Najważniejszy wynik metodologiczny: `subject_relative` wygrywa zdecydowanie. Normalizacja względem restu tej samej osoby redukuje różnice osobnicze i poprawia generalizację LOSO.
+
+Najlepszy zestaw cech to `regional`, czyli uśrednione cechy regionalne. Wrzucenie wszystkich cech naraz (`all`) nie jest najlepsze, co sugeruje, że nadmiar cech dodaje szum.
+
+Najlepiej wypadają modele drzewiaste, szczególnie `random_forest`. `rbf_svm` jest drugim najsilniejszym wariantem. Modele liniowe pozostają przydatne jako baseline i do interpretacji, ale nie dominują rankingu.
+
+Odrzucanie artefaktów najczęściej pomaga w topowych wynikach, choć tryb `keep` również pojawia się wysoko. Wnioski o artefaktach należy traktować ostrożnie, bo ruch/napięcie mięśniowe może częściowo korelować z wykonywaniem zadania.
+
+## Config Inheritance
+
+Configi modeli używają dziedziczenia przez `extends`.
+
+Przykład:
+
+```yaml
+extends: configs/base/model_bandpower_logreg.yaml
+
+experiment:
+  name: features_all_logreg
+
+features:
+  feature_groups:
+    - raw_bandpower
+    - log_bandpower
+    - ratios
+    - regional
+    - asymmetry
+```
+
+Loader znajduje się w:
+
+```text
+src/training/config_loader.py
+```
+
+Obsługuje deep merge, więc override `features.feature_groups` nie usuwa `features.type` z bazowego configu.
+
+## Metryki
+
+`balanced_accuracy` jest główną metryką, bo klasy `rest` i `task` nie są idealnie zbalansowane. Liczy średnią skuteczność dla obu klas:
+
+```text
+balanced_accuracy = (recall_rest + recall_task) / 2
+```
+
+`F1` mierzy jakość predykcji klasy `task`, łącząc precision i recall.
+
+`ROC AUC` mierzy zdolność modelu do separacji klas niezależnie od konkretnego progu decyzyjnego. `0.5` oznacza losowość, `1.0` wynik idealny.
+
+## Najważniejsze Pliki Źródłowe
+
+```text
+src/eeg_focus/pipelines/preprocess.py              # preprocessing
+src/eeg_focus/pipelines/feature_extraction.py      # ekstrakcja cech
+src/eeg_focus/features/bandpower.py                # bandpower
+src/eeg_focus/features/derived_bandpower.py        # cechy pochodne
+src/models/model_pipeline.py                       # modele sklearn
+src/training/train.py                              # trening LOSO
+src/training/feature_selection.py                  # wybór grup cech
+src/training/config_loader.py                      # extends/deep merge YAML
+src/evaluation/run_benchmark.py                    # benchmark grid
+src/evaluation/reports.py                          # zapis raportów
+```
+
+## Uwagi Metodologiczne
+
+- Nie używać losowego `train_test_split` po oknach EEG, bo powoduje leakage między próbkami tej samej osoby.
+- Raportować wyniki LOSO per subject, bo średnia może ukrywać słabe wyniki na konkretnych osobach.
+- Interpretować topowe wyniki ostrożnie: próba ma tylko 9 osób.
+- Najlepsze konfiguracje warto dalej testować na transferze `TASK1 -> TASK2` i `TASK2 -> TASK1` oraz na nowych osobach.

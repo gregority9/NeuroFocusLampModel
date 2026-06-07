@@ -4,14 +4,14 @@ import sys
 
 import joblib
 import pandas as pd
-import yaml
-
 from sklearn.model_selection import LeaveOneGroupOut
 
 from src.evaluation.metrics import compute_metrics
 from src.evaluation.reports import save_results
 from src.evaluation.reports import summarize_results
 from src.models.model_pipeline import build_model_pipeline
+from src.training.config_loader import load_config as load_yaml_config
+from src.training.feature_selection import FeatureGroupSelector
 
 
 class BandpowerTrainingPipeline:
@@ -94,6 +94,10 @@ class BandpowerTrainingPipeline:
         - only frontal channels.
         """
         feature_config = self.config.get("features", {})
+        feature_group_selector = FeatureGroupSelector(
+            feature_config.get("feature_groups", [])
+        )
+        feature_columns = feature_group_selector.select(feature_columns)
 
         include_channels = feature_config.get("include_channels", [])
         exclude_channels = feature_config.get("exclude_channels", [])
@@ -410,8 +414,7 @@ class BandpowerTrainingPipeline:
 
 
 def load_config(config_path):
-    with open(config_path, "r", encoding="utf-8") as file:
-        return yaml.safe_load(file)
+    return load_yaml_config(config_path)
 
 
 def load_feature_table(config):

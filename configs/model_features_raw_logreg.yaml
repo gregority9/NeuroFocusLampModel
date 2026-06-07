@@ -1,8 +1,8 @@
 extends: configs/base/model_bandpower_logreg.yaml
 
 experiment:
-  name: bandpower_logreg_no_high_beta
+  name: features_raw_logreg
 
 features:
-  exclude_bands:
-    - high_beta
+  feature_groups:
+    - raw_bandpower

@@ -4,3 +4,4 @@ data/processed/
 .codex
 .env/
 venv/
+reports/

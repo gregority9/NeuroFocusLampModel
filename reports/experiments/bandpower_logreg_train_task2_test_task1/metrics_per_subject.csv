@@ -1,2 +1,0 @@
-fold_id,test_subject,train_task,test_task,n_train,n_test,balanced_accuracy,confusion_matrix,f1,precision,recall,roc_auc
-0,task_transfer,TASK2,TASK1,943,938,0.5596212576721813,"[[381, 316], [103, 138]]",0.3971223021582734,0.3039647577092511,0.5726141078838174,0.5725962482958975

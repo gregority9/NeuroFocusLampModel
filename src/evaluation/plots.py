@@ -1,3 +1,7 @@
+import matplotlib
+
+matplotlib.use("Agg")
+
 from sklearn.metrics import ConfusionMatrixDisplay, confusion_matrix, RocCurveDisplay, roc_auc_score
 import matplotlib.pyplot as plt
 

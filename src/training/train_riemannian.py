@@ -2,8 +2,6 @@ import sys
 
 import numpy as np
 import pandas as pd
-import yaml
-
 from sklearn.model_selection import LeaveOneGroupOut
 
 from src.evaluation.metrics import compute_metrics
@@ -12,6 +10,7 @@ from src.evaluation.reports import summarize_results
 from src.models.riemannian import build_riemannian_logreg_pipeline
 from src.training.train import get_prediction_scores
 from src.training.train import save_model_artifacts
+from src.training.config_loader import load_config as load_yaml_config
 
 
 class RiemannianTrainingPipeline:
@@ -166,8 +165,7 @@ class RiemannianTrainingPipeline:
 
 
 def load_config(config_path):
-    with open(config_path, "r", encoding="utf-8") as file:
-        return yaml.safe_load(file)
+    return load_yaml_config(config_path)
 
 
 def load_riemannian_data(config):

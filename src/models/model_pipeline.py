@@ -3,6 +3,9 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import RobustScaler
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
+from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
 
 
 class ModelPipelineBuilder:
@@ -51,6 +54,38 @@ class ModelPipelineBuilder:
                 C=model_config.get("C", 1.0),
                 max_iter=model_config.get("max_iter", 1000),
             )
+
+        if model_type == "rbf_svm":
+            return SVC(
+                kernel="rbf",
+                class_weight=model_config.get("class_weight", "balanced"),
+                C=model_config.get("C", 1.0),
+                gamma=model_config.get("gamma", "scale"),
+                max_iter=model_config.get("max_iter", -1),
+            )
+        
+        if model_type == "random_forest":
+            return RandomForestClassifier(
+                n_estimators=model_config.get("n_estimators", 500),
+                max_depth=model_config.get("max_depth"),
+                min_samples_leaf=model_config.get("min_samples_leaf", 1),
+                max_features=model_config.get("max_features", "sqrt"),
+                class_weight=model_config.get("class_weight", "balanced"),
+                random_state=model_config.get("random_state", 42),
+                n_jobs=model_config.get("n_jobs", -1),
+            )
+        
+        if model_type == "extra_trees":
+            return ExtraTreesClassifier(
+                n_estimators=model_config.get("n_estimators", 500),
+                max_depth=model_config.get("max_depth"),
+                min_samples_leaf=model_config.get("min_samples_leaf", 1),
+                max_features=model_config.get("max_features", "sqrt"),
+                class_weight=model_config.get("class_weight", "balanced"),
+                random_state=model_config.get("random_state", 42),
+                n_jobs=model_config.get("n_jobs", -1),
+            )
+
 
         raise ValueError("Unknown model: " + str(model_type))
 

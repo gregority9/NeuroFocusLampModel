@@ -8,8 +8,8 @@ class BandpowerExtractor:
             self.bands = {
                 "delta": (1.0, 4.0),
                 "theta": (4.0, 8.0),
-                "alpha": (8.0, 13.0),
-                "beta": (13.0, 30.0)
+                "alpha": (8.0, 12.0),
+                "beta": (12.0, 30.0)
             }
         else:
             self.bands = bands

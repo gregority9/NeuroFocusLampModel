@@ -1,0 +1,175 @@
+﻿Dokumentacja Projektowa: EEG Focus Classifier
+
+1. Wstęp
+
+Współczesne interfejsy mózg-komputer oraz metody uczenia maszynowego umożliwiają analizę stanów poznawczych na podstawie sygnałów neurofizjologicznych. Dekodowanie EEG pozostaje jednak trudne ze względu na niestacjonarność sygnału, niski stosunek sygnału do szumu, artefakty fizjologiczne oraz silne różnice osobnicze.
+
+Niniejszy dokument opisuje projekt EEG Focus Classifier, realizowany w ramach projektu FocusLamp i rozwijany w kontekście prac sekcji NeuroAI Koła Naukowego Gradient. Celem projektu jest budowa reprodukowalnego pipeline'u offline do klasyfikacji okien EEG jako stan spoczynku lub aktywne zadanie poznawcze.
+
+Projekt nie jest klasyfikatorem klinicznym ADHD i nie powinien być interpretowany jako bezpośredni pomiar psychologicznego skupienia. Model rozróżnia warunki eksperymentalne: relaks oraz zadanie poznawcze.
+
+2. Cel Projektu
+
+Głównym celem jest klasyfikacja okien czasowych EEG na dwie klasy:
+
+- Stan spoczynku, etykieta 0.
+- Zaangażowanie poznawcze / zadanie, etykieta 1.
+
+Dodatkowe cele techniczne obejmują przygotowanie powtarzalnego preprocessingu, ekstrakcję klasycznych i pochodnych cech bandpower, walidację Leave-One-Subject-Out, porównanie wielu modeli i wariantów reprezentacji danych, analizę wpływu normalizacji względem restu uczestnika oraz analizę wpływu artefaktów.
+
+3. Zbiór Danych i Procedura Badawcza
+
+3.1. Charakterystyka Uczestników
+
+Zbiór obejmuje nagrania EEG od 9 uczestników: 5 osób z diagnozą ADHD oraz 4 osoby z grupy kontrolnej. Zmienna grupowa jest wykorzystywana do raportowania metryk per grupa, a nie jako target klasyfikacji.
+
+3.2. Akwizycja Danych
+
+Sygnał EEG zarejestrowano z wykorzystaniem BrainAccess Mini.
+
+- Częstotliwość próbkowania: 250 Hz.
+- Kanały EEG: AF3, AF4, F3, F4, FC5, FC6, O1, O2.
+- Dodatkowe sensory: trójosiowy akcelerometr Accel_x, Accel_y, Accel_z.
+
+3.3. Przebieg Eksperymentu
+
+Każdy uczestnik wykonywał trzy bloki:
+
+1. Rest, oznaczony jako R, 180 sekund.
+2. TASK1, 60 sekund, zadanie pamięciowe / liczenie w pamięci.
+3. TASK2, 60 sekund, zadanie słowne / generowanie słów na zadaną literę.
+
+Etykietowanie: R -> 0, TASK1 -> 1, TASK2 -> 1.
+
+4. Przetwarzanie Danych i Sanity Checks
+
+Preprocessing konfigurowany jest przez plik configs/preprocessing.yaml. Główne etapy obejmują ładowanie danych z data/raw, walidację obecności kanałów i metadanych, kontrolę długości nagrań dla R, TASK1 i TASK2, filtrację pasmową EEG 1-40 Hz, filtr notch 50 Hz, referencję average_good_channels, wyznaczanie motion score z akcelerometru, detekcję artefaktów przez robust z-score / median MAD oraz zapis scalonej tabeli po preprocessingu do data/processed/preprocessing/preprocessed_all.csv.
+
+Artefakty są traktowane dwojako. Standardowy tryb odrzuca okna oznaczone jako is_rejected. Benchmark obejmuje również tryb keep, aby sprawdzić, czy odrzucanie artefaktów poprawia generalizację.
+
+Komenda preprocessingu:
+
+python -m src.eeg_focus.main
+
+5. Okienkowanie i Ekstrakcja Cech
+
+Ekstrakcja cech działa na danych po preprocessingu. Sygnał dzielony jest na okna 2-sekundowe, co przy 250 Hz daje 500 próbek na okno.
+
+Podstawowe cechy bandpower obejmują pasma delta, theta, alpha i beta dla każdego z 8 kanałów, czyli 32 bazowe cechy.
+
+Dodane cechy pochodne obejmują:
+
+- log_bandpower: logarytmy mocy pasmowej,
+- ratios: relacje pasm, np. theta/alpha, beta/alpha, theta/beta,
+- regional: średnie regionalne, np. frontal, frontocentral, occipital, left, right,
+- asymmetry: różnice lewa-prawa, np. F3-F4, AF3-AF4, O1-O2.
+
+Po aktualnej ekstrakcji tabela data/processed/features_bandpower.csv ma 1352 okna i 175 kolumn.
+
+6. Wykorzystane Modele Uczenia Maszynowego
+
+Modele budowane są przez sklearn Pipeline w schemacie scaler -> classifier. Dzięki temu skalowanie jest dopasowywane wyłącznie na zbiorze treningowym w każdym foldzie LOSO.
+
+Modele uwzględnione w benchmarku:
+
+- logistic_regression,
+- linear_svm,
+- rbf_svm,
+- random_forest,
+- extra_trees.
+
+Dodatkowo w projekcie istnieje konfiguracja riemannian_logreg dla podejścia covariance -> tangent space -> logistic regression, ale główny benchmark 300 kombinacji dotyczył tabeli bandpower i cech pochodnych.
+
+7. Strategia Walidacji i Ewaluacja
+
+Projekt używa walidacji Leave-One-Subject-Out. W każdym foldzie model trenuje się na 8 osobach i testuje na jednej odłożonej osobie. Jest to konieczne, ponieważ losowy podział okien EEG powodowałby leakage: okna tej samej osoby trafiłyby jednocześnie do train i test.
+
+Główne metryki:
+
+- Balanced Accuracy: średnia recall dla klas rest i task.
+- F1: jakość predykcji klasy task.
+- Precision: jaki odsetek predykcji task jest poprawny.
+- Recall: jaki odsetek prawdziwych okien task został wykryty.
+- ROC AUC: zdolność separacji klas niezależnie od progu.
+
+Balanced accuracy jest główną metryką rankingu, ponieważ liczba okien rest i task nie jest idealnie zbalansowana.
+
+8. Benchmark Eksperymentalny
+
+Benchmark zdefiniowano w configs/benchmarks/features_models_full.yaml. Siatka obejmuje 10 feature setów, 5 modeli, 3 normalizacje i 2 tryby artefaktów, czyli łącznie 300 kombinacji.
+
+Feature sety: raw, log, ratios, regional, asymmetry, raw_log, raw_ratios, raw_regional, raw_log_ratios, all.
+
+Normalizacje: robust, standard, subject_relative.
+
+Tryby artefaktów: reject, keep.
+
+Komenda uruchomienia benchmarku:
+
+env MPLCONFIGDIR=/tmp/mplconfig python -B -m src.evaluation.run_benchmark configs/benchmarks/features_models_full.yaml
+
+Runner jest wznawialny: eksperymenty z istniejącym metrics.json są pomijane.
+
+9. Wyniki
+
+Zbiorcze wyniki zapisano w reports/experiments/comparison.csv. Top 15 konfiguracji zapisano w reports/benchmarks/features_models_full_top15/.
+
+Najlepszy wariant:
+
+- feature_set: regional,
+- model: random_forest,
+- normalization: subject_relative,
+- artifact_mode: reject,
+- balanced accuracy: 0.7537,
+- F1: 0.6527,
+- precision: 0.8293,
+- recall: 0.5709,
+- ROC AUC: 0.8117.
+
+Top 15 wyników:
+
+| rank | feature_set | model | normalization | artifacts | balanced_acc | F1 | ROC AUC |
+|---:|---|---|---|---|---:|---:|---:|
+| 1 | regional | random_forest | subject_relative | reject | 0.7537 | 0.6527 | 0.8117 |
+| 2 | regional | rbf_svm | subject_relative | reject | 0.7319 | 0.6161 | 0.8185 |
+| 3 | raw_regional | random_forest | subject_relative | reject | 0.7290 | 0.5960 | 0.8225 |
+| 4 | regional | random_forest | subject_relative | keep | 0.7247 | 0.5633 | 0.8098 |
+| 5 | raw | random_forest | subject_relative | reject | 0.7129 | 0.5506 | 0.8008 |
+| 6 | raw_ratios | random_forest | subject_relative | reject | 0.7006 | 0.5385 | 0.8112 |
+| 7 | raw | extra_trees | subject_relative | reject | 0.6949 | 0.4987 | 0.8046 |
+| 8 | all | random_forest | subject_relative | reject | 0.6838 | 0.5005 | 0.8137 |
+| 9 | raw_regional | extra_trees | subject_relative | reject | 0.6820 | 0.4618 | 0.8204 |
+| 10 | regional | extra_trees | subject_relative | keep | 0.6812 | 0.4188 | 0.7965 |
+| 11 | raw_regional | random_forest | subject_relative | keep | 0.6787 | 0.4115 | 0.7937 |
+| 12 | raw_regional | extra_trees | subject_relative | keep | 0.6698 | 0.3817 | 0.7935 |
+| 13 | regional | extra_trees | subject_relative | reject | 0.6696 | 0.4434 | 0.8103 |
+| 14 | all | logreg | subject_relative | reject | 0.6683 | 0.4743 | 0.6508 |
+| 15 | raw_log_ratios | random_forest | subject_relative | keep | 0.6676 | 0.4108 | 0.7812 |
+
+10. Interpretacja Wyników
+
+Najważniejszy wniosek: subject_relative normalization jest kluczowa. Wszystkie topowe konfiguracje używają normalizacji względem restu konkretnego uczestnika. Oznacza to, że różnice osobnicze w mocy EEG są większym problemem niż sama separacja rest/task.
+
+Najlepszy feature set to regional. Uśrednianie cech po regionach zmniejsza wariancję i szum pojedynczych kanałów. Wariant all nie jest najlepszy, co sugeruje, że dodanie wszystkich cech naraz może wprowadzać szum lub nadmiarowość.
+
+Najlepszy model to random_forest. Modele drzewiaste lepiej radzą sobie z nieliniowościami i interakcjami cech niż proste modele liniowe. RBF SVM również uzyskał bardzo dobry wynik, zajmując drugie miejsce.
+
+Odrzucanie artefaktów generalnie pomaga w najlepszych konfiguracjach, choć tryb keep pojawia się w top 15. Należy to interpretować ostrożnie, ponieważ część artefaktów może korelować z wykonywaniem zadania, ale nie musi reprezentować pożądanego sygnału neuronalnego.
+
+11. Ograniczenia
+
+- Zbiór obejmuje tylko 9 osób, więc wariancja między foldami jest wysoka.
+- Wyniki należy traktować jako eksploracyjne.
+- Topowe konfiguracje powinny zostać sprawdzone na nowych uczestnikach.
+- Wysoka precision przy umiarkowanym recall oznacza, że model często jest ostrożny w predykcji klasy task.
+- Należy analizować metrics_per_subject.csv, aby upewnić się, że wynik nie opiera się wyłącznie na kilku łatwych osobach.
+
+12. Podsumowanie i Wnioski
+
+Projekt osiągnął znaczącą poprawę względem wcześniejszego baseline'u bandpower + logistic regression. Najlepszy benchmarkowy model uzyskał balanced accuracy około 0.754 oraz ROC AUC około 0.812 w walidacji LOSO.
+
+Najbardziej obiecujący pipeline to:
+
+regional features -> subject-relative normalization -> random forest -> reject artifacts
+
+Dalsze prace powinny obejmować analizę per subject dla topowych modeli, task-transfer dla najlepszych konfiguracji, dobór thresholdów decyzyjnych, tuning hiperparametrów random forest i RBF SVM, testy na nowych uczestnikach oraz porównanie z podejściem riemannowskim po przygotowaniu macierzy kowariancji.

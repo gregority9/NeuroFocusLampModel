@@ -1,0 +1,105 @@
+benchmark:
+  name: features_models_full
+  base_config: configs/base/model_bandpower_logreg.yaml
+
+feature_sets:
+  raw:
+    - raw_bandpower
+
+  log:
+    - log_bandpower
+
+  ratios:
+    - ratios
+
+  regional:
+    - regional
+
+  asymmetry:
+    - asymmetry
+
+  raw_log:
+    - raw_bandpower
+    - log_bandpower
+
+  raw_ratios:
+    - raw_bandpower
+    - ratios
+
+  raw_regional:
+    - raw_bandpower
+    - regional
+
+  raw_log_ratios:
+    - raw_bandpower
+    - log_bandpower
+    - ratios
+
+  all:
+    - raw_bandpower
+    - log_bandpower
+    - ratios
+    - regional
+    - asymmetry
+
+models:
+  logreg:
+    type: logistic_regression
+    class_weight: balanced
+    C: 1.0
+    max_iter: 10000
+
+  linear_svm:
+    type: linear_svm
+    class_weight: balanced
+    C: 1.0
+    max_iter: 10000
+
+  rbf_svm:
+    type: rbf_svm
+    class_weight: balanced
+    C: 1.0
+    gamma: scale
+    max_iter: -1
+
+  random_forest:
+    type: random_forest
+    class_weight: balanced
+    n_estimators: 500
+    max_depth:
+    min_samples_leaf: 1
+    max_features: sqrt
+    random_state: 42
+    n_jobs: -1
+
+  extra_trees:
+    type: extra_trees
+    class_weight: balanced
+    n_estimators: 500
+    max_depth:
+    min_samples_leaf: 1
+    max_features: sqrt
+    random_state: 42
+    n_jobs: -1
+
+normalizations:
+  robust:
+    scaler: robust
+
+  standard:
+    scaler: standard
+
+  subject_relative:
+    scaler: robust
+    subject_relative_to_rest: true
+    subject_column: subject_id
+    task_column: task
+    rest_task: R
+    epsilon: 1.0e-8
+
+artifact_modes:
+  reject:
+    reject_rejected_windows: true
+
+  keep:
+    reject_rejected_windows: false

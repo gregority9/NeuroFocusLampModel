@@ -1,0 +1,12 @@
+extends: configs/base/model_bandpower_logreg.yaml
+
+experiment:
+  name: features_all_logreg
+
+features:
+  feature_groups:
+    - raw_bandpower
+    - log_bandpower
+    - ratios
+    - regional
+    - asymmetry

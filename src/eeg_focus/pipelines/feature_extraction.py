@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 
 from src.eeg_focus.features.bandpower import BandpowerExtractor
+from src.eeg_focus.features.derived_bandpower import DerivedBandpowerFeatureExtractor
 
 
 class FeatureExtractionPipeline:
@@ -11,6 +12,10 @@ class FeatureExtractionPipeline:
         self.sfreq = self.config["data"]["sampling_rate"]
         self.channels = self.config["data"]["channels"]
         self.bandpower = BandpowerExtractor(self.sfreq)
+        self.derived_bandpower = DerivedBandpowerFeatureExtractor(
+            self.bandpower.bands.keys(),
+            self.channels,
+        )
         self.window_size_sec = 2.0 
         self.window_samples = int(self.window_size_sec * self.sfreq)
 
@@ -48,6 +53,7 @@ class FeatureExtractionPipeline:
                 is_rejected = artifact_score > artifact_threshold
                 
                 features = self.bandpower.extract_window(window_df, self.channels)
+                features = self.derived_bandpower.transform(features)
                 
                 record = {
                     "subject_id": subject_id,
